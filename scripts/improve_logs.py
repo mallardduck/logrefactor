@@ -59,6 +59,7 @@ class LogImprover:
             context += f"\nArguments: {arguments}"
         
         prompt = f"""Improve this Go log message for clarity, professionalism, and consistency.
+This is part of a migration to structured logging.
 
 {context}
 Original message: {clean_text}
@@ -67,7 +68,7 @@ Requirements:
 - Use clear, professional language
 - Be specific and actionable
 - Use sentence case (capitalize first word only, except proper nouns)
-- If this is a format string with %v, %s, %d, etc., keep those format verbs
+- Remove or rewrite format string variables (e.g., %v, %s, %d, %w). The log message should be written assuming the data values will be visible as separate structured fields.
 - Return ONLY the improved message text, without quotes
 - Keep it concise (under 100 characters if possible)
 
