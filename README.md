@@ -242,4 +242,6 @@ MIT
 
 ---
 
-**Migrate your logging with confidence • Any library • Production-ready**
+**Migrate your logging with confidence • Any library • Maybe Production-ready (Or might eat your cat)**
+
+_**Provided without warranty - Your mileage may vary**_
