@@ -272,44 +272,47 @@ Examples:
     print(f"\nProcessing {total} log entries using {args.provider}...")
     print("-" * 80)
     
-    for idx, row in df.iterrows():
-        # Skip if already has NewMessage and skip-existing flag is set
-        if args.skip_existing and pd.notna(row.get('NewMessage')) and row['NewMessage'] != '':
-            skipped_count += 1
-            continue
-        
-        # Get the original text
-        original = row.get('MessageTemplate', '')
-        if pd.isna(original) or original == '':
-            skipped_count += 1
-            continue
-        
-        print(f"\n[{idx + 1}/{total}] {row['ID']}")
-        print(f"  Original: {original}")
-        
-        # Get context
-        function_call = row.get('OriginalCall', '') if pd.notna(row.get('OriginalCall')) else ''
-        arguments = row.get('ArgumentDetails', '') if pd.notna(row.get('ArgumentDetails')) else ''
-        log_level = row.get('LogLevel', '') if pd.notna(row.get('LogLevel')) else ''
-        
-        # Improve the message
-        improved = improver.improve_message(original, function_call, arguments, log_level)
-        
-        if improved:
-            df.at[idx, 'NewMessage'] = improved
-            improved_count += 1
-            print(f"  Improved: {improved}")
-        else:
-            failed_count += 1
-            print(f"  Failed to improve")
-    
+    try:
+        for idx, row in df.iterrows():
+            # Skip if already has NewMessage and skip-existing flag is set
+            if args.skip_existing and pd.notna(row.get('NewMessage')) and row['NewMessage'] != '':
+                skipped_count += 1
+                continue
+
+            # Get the original text
+            original = row.get('MessageTemplate', '')
+            if pd.isna(original) or original == '':
+                skipped_count += 1
+                continue
+
+            print(f"\n[{idx + 1}/{total}] {row['ID']}")
+            print(f"  Original: {original}")
+
+            # Get context
+            function_call = row.get('OriginalCall', '') if pd.notna(row.get('OriginalCall')) else ''
+            arguments = row.get('ArgumentDetails', '') if pd.notna(row.get('ArgumentDetails')) else ''
+            log_level = row.get('LogLevel', '') if pd.notna(row.get('LogLevel')) else ''
+
+            # Improve the message
+            improved = improver.improve_message(original, function_call, arguments, log_level)
+
+            if improved:
+                df.at[idx, 'NewMessage'] = improved
+                improved_count += 1
+                print(f"  Improved: {improved}")
+            else:
+                failed_count += 1
+                print(f"  Failed to improve")
+    except KeyboardInterrupt:
+        print("\n\nInterrupted by user. Saving partial results...")
+
     print("\n" + "=" * 80)
     print(f"Summary:")
     print(f"  Total entries: {total}")
     print(f"  Improved: {improved_count}")
     print(f"  Skipped: {skipped_count}")
     print(f"  Failed: {failed_count}")
-    
+
     # Save the updated CSV
     print(f"\nSaving to {args.output_csv}...")
     try:
@@ -318,7 +321,7 @@ Examples:
     except Exception as e:
         print(f"Error saving CSV: {e}")
         sys.exit(1)
-    
+
     print("\nNext steps:")
     print(f"1. Review {args.output_csv} to verify the improvements")
     print(f"2. Run: ./logrefactor transform -input {args.output_csv} -path ./your-project -dry-run")
