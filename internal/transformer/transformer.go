@@ -524,7 +524,10 @@ func replaceCallExpr(call *ast.CallExpr, newCode string, fset *token.FileSet, co
 	// Convert to bytes
 	lines := strings.Split(string(*content), "\n")
 	
-	if start.Line > len(lines) || end.Line > len(lines) {
+	// Validate line numbers
+	if start.Line < 1 || start.Line > len(lines) || end.Line < 1 || end.Line > len(lines) {
+		fmt.Fprintf(os.Stderr, "Warning: invalid line numbers %d-%d (file has %d lines)\n", 
+			start.Line, end.Line, len(lines))
 		return
 	}
 
@@ -532,20 +535,52 @@ func replaceCallExpr(call *ast.CallExpr, newCode string, fset *token.FileSet, co
 	if start.Line == end.Line {
 		// Single line replacement
 		line := lines[start.Line-1]
-		before := line[:start.Column-1]
-		after := line[end.Column-1:]
+		
+		// Validate column positions
+		startCol := start.Column - 1
+		endCol := end.Column - 1
+		
+		if startCol < 0 || startCol > len(line) {
+			startCol = 0
+		}
+		if endCol < 0 || endCol > len(line) {
+			endCol = len(line)
+		}
+		if startCol > endCol {
+			fmt.Fprintf(os.Stderr, "Warning: invalid column range %d-%d for line: %s\n", 
+				start.Column, end.Column, line)
+			return
+		}
+		
+		before := line[:startCol]
+		after := line[endCol:]
 		lines[start.Line-1] = before + newCode + after
 	} else {
 		// Multi-line replacement
 		firstLine := lines[start.Line-1]
 		lastLine := lines[end.Line-1]
 		
-		before := firstLine[:start.Column-1]
-		after := lastLine[end.Column-1:]
+		// Validate column positions
+		startCol := start.Column - 1
+		if startCol < 0 || startCol > len(firstLine) {
+			startCol = 0
+		}
+		
+		endCol := end.Column - 1
+		if endCol < 0 || endCol > len(lastLine) {
+			endCol = len(lastLine)
+		}
+		
+		before := firstLine[:startCol]
+		after := lastLine[endCol:]
 		
 		// Replace the lines
 		newLine := before + newCode + after
-		lines = append(lines[:start.Line-1], append([]string{newLine}, lines[end.Line:]...)...)
+		newLines := append(lines[:start.Line-1], newLine)
+		if end.Line < len(lines) {
+			newLines = append(newLines, lines[end.Line:]...)
+		}
+		lines = newLines
 	}
 
 	*content = []byte(strings.Join(lines, "\n"))
