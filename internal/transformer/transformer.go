@@ -45,7 +45,7 @@ type TemplateConfig struct {
 }
 
 // Transform reads the CSV and applies the transformations to the source files
-func Transform(csvFile, rootPath string, dryRun bool, configFile string) error {
+func Transform(csvFile, rootPath string, dryRun bool, configFile string, autoMap bool) error {
 	// Load template configuration
 	config, err := loadTemplateConfig(configFile)
 	if err != nil {
@@ -75,7 +75,7 @@ func Transform(csvFile, rootPath string, dryRun bool, configFile string) error {
 
 	// Process each file
 	for filePath, updates := range fileUpdates {
-		if err := transformFile(filePath, updates, config, dryRun); err != nil {
+		if err := transformFile(filePath, updates, config, dryRun, autoMap); err != nil {
 			return fmt.Errorf("failed to transform %s: %w", filePath, err)
 		}
 	}
@@ -158,7 +158,7 @@ func loadUpdates(csvFile string) ([]LogUpdate, error) {
 }
 
 // transformFile applies updates to a single file
-func transformFile(filePath string, updates []LogUpdate, config *TemplateConfig, dryRun bool) error {
+func transformFile(filePath string, updates []LogUpdate, config *TemplateConfig, dryRun bool, autoMap bool) error {
 	// Read the original file content
 	content, err := os.ReadFile(filePath)
 	if err != nil {
@@ -199,7 +199,7 @@ func transformFile(filePath string, updates []LogUpdate, config *TemplateConfig,
 		}
 
 		// Generate the new log call
-		newCode, err := generateStructuredLogCall(update, config)
+		newCode, err := generateStructuredLogCall(update, config, autoMap)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to generate code for %s: %v\n", update.ID, err)
 			return true
@@ -241,7 +241,7 @@ func transformFile(filePath string, updates []LogUpdate, config *TemplateConfig,
 }
 
 // generateStructuredLogCall generates the new structured logging call based on template
-func generateStructuredLogCall(update LogUpdate, config *TemplateConfig) (string, error) {
+func generateStructuredLogCall(update LogUpdate, config *TemplateConfig, autoMap bool) (string, error) {
 	// Parse structured fields
 	var fields []FieldMapping
 	if update.StructuredFields != "" {
@@ -249,6 +249,9 @@ func generateStructuredLogCall(update LogUpdate, config *TemplateConfig) (string
 			// Try parsing as simple key=value format
 			fields = parseSimpleFields(update.StructuredFields)
 		}
+	} else if autoMap && update.ArgumentDetails != "" {
+		// Auto-generate field mappings from ArgumentDetails if StructuredFields is empty
+		fields = autoGenerateFieldsFromArguments(update.ArgumentDetails)
 	}
 
 	// Use NewMessage if provided, otherwise use MessageTemplate
@@ -411,6 +414,65 @@ func parseSimpleFields(fieldsStr string) []FieldMapping {
 		})
 	}
 
+	return fields
+}
+
+// autoGenerateFieldsFromArguments parses ArgumentDetails and auto-generates field mappings
+// ArgumentDetails format: "key(type)=expression[formatVerb]; key2(type2)=expression2[formatVerb2]"
+// Example: "error(error)=err[%v]; username(unknown)=user.Name[%s]"
+func autoGenerateFieldsFromArguments(argumentDetails string) []FieldMapping {
+	var fields []FieldMapping
+	
+	// Split by semicolon
+	parts := strings.Split(argumentDetails, ";")
+	
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		
+		// Parse: "key(type)=expression[formatVerb]"
+		// Example: "error(error)=err[%v]"
+		
+		// Find the key (everything before '(')
+		openParen := strings.Index(part, "(")
+		if openParen == -1 {
+			continue
+		}
+		key := strings.TrimSpace(part[:openParen])
+		
+		// Find the type (between '(' and ')')
+		closeParen := strings.Index(part, ")")
+		if closeParen == -1 || closeParen <= openParen {
+			continue
+		}
+		typ := strings.TrimSpace(part[openParen+1 : closeParen])
+		
+		// Find the expression (between '=' and '[' or end of string)
+		equals := strings.Index(part, "=")
+		if equals == -1 || equals <= closeParen {
+			continue
+		}
+		
+		// Extract expression (might have [formatVerb] at the end)
+		exprPart := strings.TrimSpace(part[equals+1:])
+		openBracket := strings.Index(exprPart, "[")
+		
+		var expr string
+		if openBracket != -1 {
+			expr = strings.TrimSpace(exprPart[:openBracket])
+		} else {
+			expr = exprPart
+		}
+		
+		fields = append(fields, FieldMapping{
+			Key:        key,
+			Expression: expr,
+			Type:       typ,
+		})
+	}
+	
 	return fields
 }
 

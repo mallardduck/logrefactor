@@ -46,7 +46,8 @@ go build -o logrefactor
 # 1. Collect log statements
 ./logrefactor collect -path ./myproject -output logs.csv
 
-# 2. Edit logs.csv - fill in NewMessage and StructuredFields columns
+# 2. Edit logs.csv - just fill in NewMessage column
+#    (StructuredFields can be left empty - it will auto-map from ArgumentDetails!)
 
 # 3. Transform (preview)
 ./logrefactor transform -input logs.csv -config templates/slog.json -dry-run
@@ -63,11 +64,17 @@ log.Printf("processing user %s with age %d", username, age)
 log.Printf("error for user %s: %v", username, err)
 ```
 
-**After running collect, edit the CSV:**
+**After running collect, the CSV shows:**
 ```csv
-NewMessage,StructuredFields
-Processing user,"username=username, age=age"
-Failed to process user,"username=username, error=err"
+ArgumentDetails: "username(unknown)=username[%s]; age(int)=age[%d]"
+ArgumentDetails: "username(unknown)=username[%s]; error(error)=err[%v]"
+```
+
+**Edit CSV (only NewMessage - StructuredFields auto-maps!):**
+```csv
+NewMessage
+Processing user
+Failed to process user
 ```
 
 **Transformed code (slog):**
@@ -80,6 +87,8 @@ logger.Error("Failed to process user",
     slog.Any("error", err))
 ```
 
+✨ **No manual field mapping needed!** The tool used `ArgumentDetails` automatically.
+
 ## CSV Schema
 
 The collector generates a CSV with these columns:
@@ -89,8 +98,28 @@ The collector generates a CSV with these columns:
 | MessageTemplate | - | Original format string |
 | ArgumentDetails | - | Extracted variables with types |
 | **NewMessage** | ✏️ | Improved message (no format verbs) |
-| **StructuredFields** | ✏️ | Field mappings: `key=expr, key2=expr2` or JSON |
+| **StructuredFields** | ✏️ (optional) | Field mappings: `key=expr, key2=expr2` or JSON |
 | NewCall | ✏️ (optional) | Target logging function |
+
+### 🚀 Auto-Mapping Feature
+
+**NEW:** If you leave `StructuredFields` empty, the tool automatically generates field mappings from `ArgumentDetails`!
+
+This means you only need to fill in `NewMessage` for a quick migration:
+
+```csv
+MessageTemplate,ArgumentDetails,NewMessage,StructuredFields
+"error: %v","error(error)=err[%v]",Failed to process,
+```
+
+The tool automatically maps: `error=err` → `slog.Any("error", err)`
+
+See [AUTO_MAPPING.md](AUTO_MAPPING.md) for details.
+
+**Override when needed:**
+```csv
+StructuredFields: "db_error=err, retry_count=retries"
+```
 
 ## Supported Logging Libraries
 
@@ -146,6 +175,7 @@ This gives you complete control over the output format.
 - `-path` - Directory to transform
 - `-config` - Template config file
 - `-dry-run` - Preview without applying
+- `-auto-map` - Auto-generate fields from ArgumentDetails when StructuredFields is empty (default: true)
 
 ## Migration Strategies
 

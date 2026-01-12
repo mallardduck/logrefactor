@@ -21,6 +21,7 @@ func main() {
 	transformPath := transformCmd.String("path", ".", "Path to the Go project or package")
 	transformDryRun := transformCmd.Bool("dry-run", false, "Show changes without applying them")
 	transformConfig := transformCmd.String("config", "", "Template configuration file (JSON)")
+	transformAutoMap := transformCmd.Bool("auto-map", true, "Auto-generate field mappings from ArgumentDetails when StructuredFields is empty")
 
 	if len(os.Args) < 2 {
 		fmt.Println("Usage:")
@@ -43,7 +44,7 @@ func main() {
 
 	case "transform":
 		transformCmd.Parse(os.Args[2:])
-		if err := transformer.Transform(*transformInput, *transformPath, *transformDryRun, *transformConfig); err != nil {
+		if err := transformer.Transform(*transformInput, *transformPath, *transformDryRun, *transformConfig, *transformAutoMap); err != nil {
 			fmt.Fprintf(os.Stderr, "Error transforming log entries: %v\n", err)
 			os.Exit(1)
 		}
