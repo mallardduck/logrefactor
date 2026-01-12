@@ -1,0 +1,5 @@
+{
+  "style": "logrus",
+  "loggerVar": "log",
+  "template": ""
+}

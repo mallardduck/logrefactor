@@ -1,0 +1,5 @@
+{
+  "style": "custom",
+  "loggerVar": "myLogger",
+  "template": "{{.Logger}}.{{.Level}}(\"{{.Message}}\"{{range .Fields}}, \"{{.Key}}\", {{.Expression}}{{end}})"
+}
